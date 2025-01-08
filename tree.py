@@ -8,11 +8,13 @@ class Tree:
     
     def fit(self, X: np.ndarray, y: np.ndarray, lmbda: float = 0.0, alpha: float = 0.0):
         '''Fit the tree to the data.'''
+        #TODO
         pass
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         '''Predict the output of each sample of X.'''
-        pass
+        #TODO
+        return np.zeros(X.shape[0])
 
 class Node:
     '''A class that represents a node of a Tree.'''
