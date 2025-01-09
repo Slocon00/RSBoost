@@ -12,7 +12,6 @@ class XGBTreeModel:
                  max_depth: int = 3,
                  starting_value: float = 0.5,
                  lr: float = 0.1,
-                 alpha: float = 0.0,
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
                  measure: str = 'gini'):
@@ -20,7 +19,6 @@ class XGBTreeModel:
         self.max_depth = max_depth
         self.starting_value = starting_value
         self.lr = lr
-        self.alpha = alpha
         self.lmbda = lmbda
         self.gamma = gamma
 
@@ -39,10 +37,12 @@ class XGBTreeModel:
 
         residuals = y - self.starting_value
         for _ in range(self.n_estimators):
-            tree = Tree(max_depth=self.max_depth)
-            tree.fit(X, residuals, lmbda=self.lmbda, alpha=self.alpha)
+            tree = Tree(max_depth=self.max_depth,
+                        measure=self.measure,
+                        lmbda=self.lmbda)
+            tree.fit(X, residuals)
 
-            # TODO tree pruning using gamma
+            # TODO tree pruning using gamma?
             residuals = tree.predict(X)
             self.ensemble.append(tree)
 
