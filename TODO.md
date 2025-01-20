@@ -1,6 +1,6 @@
 - [ ] Run tests on datasets used in the paper
     - [ ] Allstate
-    - [ ] Higgs
+    - [x] Higgs
     - [ ] Criteo
     - [ ] Yahoo
 
