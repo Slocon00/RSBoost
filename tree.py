@@ -123,7 +123,7 @@ class Tree:
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         '''Predict the output of each sample of X.'''
-        pred = np.ndarray(X.shape[0])
+        pred = np.zeros(X.shape[0])
         
         for i in range(X.shape[0]):
             curr = self.root

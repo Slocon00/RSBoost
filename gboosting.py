@@ -2,7 +2,7 @@ import numpy as np
 from tree import Tree
 from tqdm import tqdm # type: ignore
 
-class XGBTreeModel:
+class _XGBTreeModel:
     '''A class that represents a gradient boosting tree model 
     trained with the algorithm used by XGBoost.
     '''
@@ -29,7 +29,7 @@ class XGBTreeModel:
         self.ensemble = []
 
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
-        '''Produces a fitted model.'''
+        '''Produce a fitted model.'''
         if X.shape[0] != y.shape[0]:
             raise ValueError("X and y must have the same number of samples; "
                              "X has {} and y has {} instead.".format(X.shape[0], y.shape[0]))
@@ -51,8 +51,70 @@ class XGBTreeModel:
         pbar.close()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        '''Predicts the output of each sample of X.'''
-        pred = np.zeros(X.shape[0])
+        '''Predict the output of each sample of X.'''
+        # Output is starting value + sum of predictions of each tree
+        pred = np.array([self.starting_value] * X.shape[0])
         for tree in self.ensemble:
             pred += tree.predict(X)
         return pred
+
+
+class XGBTreeClassifier(_XGBTreeModel):
+    '''A class that represents a gradient boosting tree classifier 
+    trained with the algorithm used by XGBoost.
+    '''
+    def __init__(self,
+                 n_estimators: int = 100,
+                 max_depth: int = 3,
+                 starting_value: float = 0.5,
+                 eta: float = 0.1,
+                 lmbda: float = 0.0,
+                 gamma: float = 0.0,
+                 algorithm: str = 'exact'):
+        super().__init__(n_estimators,
+                         max_depth,
+                         starting_value,
+                         eta,
+                         lmbda,
+                         gamma,
+                         algorithm)
+    
+    def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
+        '''Produce a fitted model.'''
+        # TODO check what happens if y is not binary
+        super().fit(X, y, verbose)
+
+    def predict(self, X):
+        '''Predict class labels for each sample in X.'''
+        proba = super().predict(X)
+        pred = np.round(proba) + 0  # the + 0 "fixes" negative 0s
+        return pred
+    
+
+class XGBTreeRegressor(_XGBTreeModel):
+    '''A class that represents a gradient boosting tree regressor 
+    trained with the algorithm used by XGBoost.
+    '''
+    def __init__(self,
+                 n_estimators: int = 100,
+                 max_depth: int = 3,
+                 starting_value: float = 0.5,
+                 eta: float = 0.1,
+                 lmbda: float = 0.0,
+                 gamma: float = 0.0,
+                 algorithm: str = 'exact'):
+        super().__init__(n_estimators,
+                         max_depth,
+                         starting_value,
+                         eta,
+                         lmbda,
+                         gamma,
+                         algorithm)
+    
+    def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
+        '''Produce a fitted model.'''
+        super().fit(X, y, verbose)
+
+    def predict(self, X):
+        '''Predict regression value for each sample in X.'''
+        return super().predict(X)
