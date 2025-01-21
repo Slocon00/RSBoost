@@ -1,4 +1,5 @@
 .DS_Store
 datasets/
+figs/
 __pycache__/
 *.pdf
