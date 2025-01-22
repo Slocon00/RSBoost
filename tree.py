@@ -42,33 +42,41 @@ class Tree:
         self.loss = loss
         self.algorithm = algorithm
     
-    def fit(self, X: np.ndarray, y: np.ndarray, preds: np.ndarray):
+    def fit(self, X: np.ndarray, y: np.ndarray, probs: np.ndarray):
         '''Fit the tree to the data.'''
-        self.root = self._build_tree(X, y, preds, 0)
+        self.root = self._build_tree(X, y, probs, 0)
 
     def _build_tree(self,
                     X: np.ndarray,
                     y: np.ndarray,
-                    preds: np.ndarray,
+                    probs: np.ndarray,
                     depth: int):
         '''Build the tree recursively.'''
 
         if depth == self.max_depth:
-            return _Node(None, np.mean(y) + self.lmbda)
+            if self.loss == 'mse':
+                value = np.sum(y)/(len(y)+self.lmbda)
+            elif self.loss == 'logistic':
+                value = np.sum(y)/(np.sum(probs*(1-probs)) + self.lmbda)
+            return _Node(None, value)
         
-        split = self._find_best_split(X, y, preds)
+        split = self._find_best_split(X, y, probs)
         if split is None:
             # No split improves the gain
-            return _Node(None, np.mean(y) + self.lmbda)
+            if self.loss == 'mse':
+                value = np.sum(y)/(len(y)+self.lmbda)
+            elif self.loss == 'logistic':
+                value = np.sum(y)/(np.sum(probs*(1-probs)) + self.lmbda)
+            return _Node(None, value)
 
         node = _Node(*split)
         left_child = self._build_tree(X[X[:, node.feature] <= node.threshold],
                                       y[X[:, node.feature] <= node.threshold],
-                                      preds[X[:, node.feature] <= node.threshold],
+                                      probs[X[:, node.feature] <= node.threshold],
                                       depth + 1)
         right_child = self._build_tree(X[X[:, node.feature] > node.threshold],
                                        y[X[:, node.feature] > node.threshold],
-                                       preds[X[:, node.feature] > node.threshold],
+                                       probs[X[:, node.feature] > node.threshold],
                                        depth + 1)
         node.add_left(left_child)
         node.add_right(right_child)
@@ -78,23 +86,23 @@ class Tree:
     def _find_best_split(self,
                          X: np.ndarray,
                          y: np.ndarray,
-                         preds: np.ndarray,
+                         probs: np.ndarray,
                          algorithm: str = 'exact') -> tuple[int, float] | None:
         '''Return the best split for the data, using the specified algorithm.'''
-        if algorithm == 'exact': return self._split_exact(X, y, preds)
-        if algorithm == 'approx': return self._split_approx(X, y, preds)
+        if algorithm == 'exact': return self._split_exact(X, y, probs)
+        if algorithm == 'approx': return self._split_approx(X, y, probs)
 
     def _split_exact(self,
                      X: np.ndarray,
                      y: np.ndarray,
-                     preds: np.ndarray
+                     probs: np.ndarray
                      ) -> tuple[int, float] | None:
         '''Find the best split that produces a positive similarity score gain
         using the exact algorithm, returning a tuple of feature index and
         threshold. If no such split exists, return None.
         '''
         best_split = None
-        parent_sim = self._similarity_score(y, preds)
+        parent_sim = self._similarity_score(y, probs)
 
         for i in range(X.shape[1]):
             # TODO categorical values?
@@ -105,8 +113,8 @@ class Tree:
             for split in splits:
                 left_y = y[X[:,i] <= split]
                 right_y = y[X[:,i] > split]
-                left_pred = preds[X[:,i] <= split]
-                right_pred = preds[X[:,i] > split]
+                left_pred = probs[X[:,i] <= split]
+                right_pred = probs[X[:,i] > split]
 
                 # if either leaf becomes empty skip
                 if len(left_y) < 1 or len(right_y) < 1:
@@ -125,7 +133,7 @@ class Tree:
     def _split_approx(self,
                       X: np.ndarray,
                       y: np.ndarray,
-                      preds: np.ndarray
+                      probs: np.ndarray
                       ) -> tuple[int, float] | None:
         '''Find the best split that produces a positive similarity score gain
         using the approximate algorithm, returning a tuple of feature index and
@@ -134,15 +142,13 @@ class Tree:
         # TODO
         return None
 
-    def _similarity_score(self, y: np.ndarray, preds: np.ndarray) -> float:
+    def _similarity_score(self, y: np.ndarray, probs: np.ndarray) -> float:
         '''Return the similarity score of the data.'''
-        # FIXME changing lambda makes the prediction go crazy for some reason
         if self.loss == 'mse':
             # gi is y, hi is 1
             return np.sum(y)**2 / (len(y) + self.lmbda)
         if self.loss == 'logistic':
-            sum = (np.sum(preds*(1-preds)))
-            return np.sum(y)**2 / (sum + self.lmbda)
+            return np.sum(y)**2 / (np.sum(probs*(1-probs)) + self.lmbda)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         '''Predict the output of each sample of X.'''        

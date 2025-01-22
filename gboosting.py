@@ -49,11 +49,18 @@ class _XGBTreeModel:
                         gamma=self.gamma,
                         loss=self.loss,
                         algorithm=self.algorithm)
-            tree.fit(X, y - pred, pred)
+            tree.fit(X, (y - pred), pred)
 
-            pred += self.eta * tree.predict(X)
+            if self.loss == 'logistic':
+                # convert pred to log odds, add to prediction,
+                # then convert back to probability
+                pred = np.log(pred/(1-pred))
+                pred += self.eta * tree.predict(X)
+                pred = 1/(1 + np.exp(-pred))
+            else:
+                pred += self.eta * tree.predict(X)
+            
             self.ensemble.append(tree)
-
             pbar.update(1)
         pbar.close()
 
@@ -62,7 +69,14 @@ class _XGBTreeModel:
         # Output is starting value + sum of predictions of each tree
         pred = np.array([self.starting_value] * X.shape[0])
         for tree in self.ensemble:
-            pred += self.eta * tree.predict(X)
+            if self.loss == 'logistic':
+                # convert pred to log odds, add to prediction,
+                # then convert back to probability
+                pred = np.log(pred/(1-pred))
+                pred += self.eta * tree.predict(X)
+                pred = 1/(1 + np.exp(-pred))
+            else:
+                pred += self.eta * tree.predict(X)
         return pred
 
 
@@ -90,7 +104,6 @@ class XGBTreeClassifier(_XGBTreeModel):
     
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
         '''Produce a fitted model.'''
-        # TODO check what happens if y is not binary
         super().fit(X, y, verbose)
 
     def predict(self, X):
