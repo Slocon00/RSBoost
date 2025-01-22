@@ -5,6 +5,9 @@
     - [ ] Yahoo
 
 - [ ] Implement separate interfaces for Regressor, Classifier, Ranker
+    - [x] Classifier
+    - [x] Regressor
+    - [ ] Ranker
 
 - [ ] Implement approximate split finder algorithm
 

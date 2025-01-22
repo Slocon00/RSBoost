@@ -13,6 +13,7 @@ class _XGBTreeModel:
                  eta: float = 0.1,
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
+                 loss: str = 'mse',
                  algorithm: str = 'exact'):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
@@ -21,6 +22,11 @@ class _XGBTreeModel:
         self.lmbda = lmbda
         self.gamma = gamma
         
+        if loss == 'mse' or loss == 'logistic':
+            self.loss = loss
+        else:
+            raise ValueError("Loss function must be either 'mse' or 'logistic'.")
+
         if algorithm == 'exact' or algorithm == 'approx':
             self.algorithm = algorithm
         else:
@@ -36,15 +42,16 @@ class _XGBTreeModel:
         
         pbar = tqdm(range(self.n_estimators), disable=not verbose)
 
-        residuals = y - self.starting_value
+        pred = np.array([self.starting_value] * X.shape[0])
         for _ in range(self.n_estimators):
             tree = Tree(max_depth=self.max_depth,
                         lmbda=self.lmbda,
+                        gamma=self.gamma,
+                        loss=self.loss,
                         algorithm=self.algorithm)
-            tree.fit(X, residuals)
+            tree.fit(X, y - pred, pred)
 
-            # TODO tree pruning using gamma?
-            residuals = self.eta * tree.predict(X)
+            pred += self.eta * tree.predict(X)
             self.ensemble.append(tree)
 
             pbar.update(1)
@@ -55,7 +62,7 @@ class _XGBTreeModel:
         # Output is starting value + sum of predictions of each tree
         pred = np.array([self.starting_value] * X.shape[0])
         for tree in self.ensemble:
-            pred += tree.predict(X)
+            pred += self.eta * tree.predict(X)
         return pred
 
 
@@ -70,6 +77,7 @@ class XGBTreeClassifier(_XGBTreeModel):
                  eta: float = 0.1,
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
+                 loss: str = 'logistic',
                  algorithm: str = 'exact'):
         super().__init__(n_estimators,
                          max_depth,
@@ -77,6 +85,7 @@ class XGBTreeClassifier(_XGBTreeModel):
                          eta,
                          lmbda,
                          gamma,
+                         loss,
                          algorithm)
     
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
@@ -86,10 +95,10 @@ class XGBTreeClassifier(_XGBTreeModel):
 
     def predict(self, X):
         '''Predict class labels for each sample in X.'''
-        proba = super().predict(X)
-        pred = np.round(proba) + 0  # the + 0 "fixes" negative 0s
+        pred = super().predict(X)
+        pred = np.round(pred) + 0  # the + 0 "fixes" negative 0s
         return pred
-    
+
 
 class XGBTreeRegressor(_XGBTreeModel):
     '''A class that represents a gradient boosting tree regressor 
@@ -102,6 +111,7 @@ class XGBTreeRegressor(_XGBTreeModel):
                  eta: float = 0.1,
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
+                 loss: str = 'mse',
                  algorithm: str = 'exact'):
         super().__init__(n_estimators,
                          max_depth,
@@ -109,6 +119,7 @@ class XGBTreeRegressor(_XGBTreeModel):
                          eta,
                          lmbda,
                          gamma,
+                         loss,
                          algorithm)
     
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
