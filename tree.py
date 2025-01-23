@@ -33,50 +33,48 @@ class Tree:
                  max_depth: int = None,
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
-                 loss: str = 'mse',
                  algorithm: str = 'exact'):
         self.root = None
         self.max_depth = max_depth
         self.lmbda = lmbda
         self.gamma = gamma
-        self.loss = loss
         self.algorithm = algorithm
     
-    def fit(self, X: np.ndarray, y: np.ndarray, probs: np.ndarray):
+    def fit(self,
+            X: np.ndarray,
+            y: np.ndarray,
+            gradients: np.ndarray,
+            hessians: np.ndarray):
         '''Fit the tree to the data.'''
-        self.root = self._build_tree(X, y, probs, 0)
+        self.root = self._build_tree(X, y, gradients, hessians, 0)
 
     def _build_tree(self,
                     X: np.ndarray,
                     y: np.ndarray,
-                    probs: np.ndarray,
+                    gradients: np.ndarray,
+                    hessians: np.ndarray,
                     depth: int):
         '''Build the tree recursively.'''
-
         if depth == self.max_depth:
-            if self.loss == 'mse':
-                value = np.sum(y)/(len(y)+self.lmbda)
-            elif self.loss == 'logistic':
-                value = np.sum(y)/(np.sum(probs*(1-probs)) + self.lmbda)
-            return _Node(None, value)
+            pred = np.sum(gradients)/(np.sum(hessians) + self.lmbda)
+            return _Node(None, pred)
         
-        split = self._find_best_split(X, y, probs)
+        split = self._find_best_split(X, y, gradients, hessians)
         if split is None:
             # No split improves the gain
-            if self.loss == 'mse':
-                value = np.sum(y)/(len(y)+self.lmbda)
-            elif self.loss == 'logistic':
-                value = np.sum(y)/(np.sum(probs*(1-probs)) + self.lmbda)
-            return _Node(None, value)
+            pred = np.sum(gradients)/(np.sum(hessians) + self.lmbda)
+            return _Node(None, pred)
 
         node = _Node(*split)
         left_child = self._build_tree(X[X[:, node.feature] <= node.threshold],
                                       y[X[:, node.feature] <= node.threshold],
-                                      probs[X[:, node.feature] <= node.threshold],
+                                      gradients[X[:, node.feature] <= node.threshold],
+                                      hessians[X[:, node.feature] <= node.threshold],
                                       depth + 1)
         right_child = self._build_tree(X[X[:, node.feature] > node.threshold],
                                        y[X[:, node.feature] > node.threshold],
-                                       probs[X[:, node.feature] > node.threshold],
+                                       gradients[X[:, node.feature] > node.threshold],
+                                       hessians[X[:, node.feature] > node.threshold],
                                        depth + 1)
         node.add_left(left_child)
         node.add_right(right_child)
@@ -86,23 +84,24 @@ class Tree:
     def _find_best_split(self,
                          X: np.ndarray,
                          y: np.ndarray,
-                         probs: np.ndarray,
+                         gradients: np.ndarray,
+                         hessians: np.ndarray,
                          algorithm: str = 'exact') -> tuple[int, float] | None:
         '''Return the best split for the data, using the specified algorithm.'''
-        if algorithm == 'exact': return self._split_exact(X, y, probs)
-        if algorithm == 'approx': return self._split_approx(X, y, probs)
+        if algorithm == 'exact': return self._split_exact(X, y, gradients, hessians)
+        if algorithm == 'approx': return self._split_approx(X, y, gradients, hessians)
 
     def _split_exact(self,
                      X: np.ndarray,
                      y: np.ndarray,
-                     probs: np.ndarray
-                     ) -> tuple[int, float] | None:
+                     gradients: np.ndarray,
+                     hessians: np.ndarray) -> tuple[int, float] | None:
         '''Find the best split that produces a positive similarity score gain
         using the exact algorithm, returning a tuple of feature index and
         threshold. If no such split exists, return None.
         '''
         best_split = None
-        parent_sim = self._similarity_score(y, probs)
+        parent_sim = self._similarity_score(y, gradients, hessians)
 
         for i in range(X.shape[1]):
             # TODO categorical values?
@@ -113,15 +112,18 @@ class Tree:
             for split in splits:
                 left_y = y[X[:,i] <= split]
                 right_y = y[X[:,i] > split]
-                left_pred = probs[X[:,i] <= split]
-                right_pred = probs[X[:,i] > split]
+
+                left_g = gradients[X[:,i] <= split]
+                right_g = gradients[X[:,i] > split]
+                left_h = hessians[X[:,i] <= split]
+                right_h = hessians[X[:,i] > split]
 
                 # if either leaf becomes empty skip
                 if len(left_y) < 1 or len(right_y) < 1:
                     continue
 
-                left_sim = self._similarity_score(left_y, left_pred)
-                right_sim = self._similarity_score(right_y, right_pred)
+                left_sim = self._similarity_score(left_y, left_g, left_h)
+                right_sim = self._similarity_score(right_y, right_g, right_h)
 
                 if (left_sim + right_sim - parent_sim) - self.gamma > 0.0:
                     # gain is positive, better than last best
@@ -133,8 +135,8 @@ class Tree:
     def _split_approx(self,
                       X: np.ndarray,
                       y: np.ndarray,
-                      probs: np.ndarray
-                      ) -> tuple[int, float] | None:
+                      gradients: np.ndarray,
+                      hessians: np.ndarray) -> tuple[int, float] | None:
         '''Find the best split that produces a positive similarity score gain
         using the approximate algorithm, returning a tuple of feature index and
         threshold. If no such split exists, return None.
@@ -142,13 +144,9 @@ class Tree:
         # TODO
         return None
 
-    def _similarity_score(self, y: np.ndarray, probs: np.ndarray) -> float:
+    def _similarity_score(self, y: np.ndarray, gradients: np.ndarray, hessians: np.ndarray) -> float:
         '''Return the similarity score of the data.'''
-        if self.loss == 'mse':
-            # gi is y, hi is 1
-            return np.sum(y)**2 / (len(y) + self.lmbda)
-        if self.loss == 'logistic':
-            return np.sum(y)**2 / (np.sum(probs*(1-probs)) + self.lmbda)
+        return np.sum(gradients)**2 / (np.sum(hessians) + self.lmbda)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         '''Predict the output of each sample of X.'''        

@@ -34,7 +34,23 @@ class _XGBTreeModel:
 
         self.ensemble = []
 
-    def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
+    def gradient(self, y: np.ndarray, pred: np.ndarray) -> np.ndarray:
+        if self.loss == 'mse':
+            return y - pred
+        elif self.loss == 'logistic':
+            return y - pred
+
+    def hessian(self, y: np.ndarray, pred: np.ndarray) -> np.ndarray:
+        if self.loss == 'mse':
+            return np.ones(y.shape[0])
+        elif self.loss == 'logistic':
+            return pred * (1 - pred)
+
+    def fit(self,
+            X: np.ndarray,
+            y: np.ndarray,
+            verbose: bool = False,
+            thresh: float = 1e-4):
         '''Produce a fitted model.'''
         if X.shape[0] != y.shape[0]:
             raise ValueError("X and y must have the same number of samples; "
@@ -44,12 +60,15 @@ class _XGBTreeModel:
 
         pred = np.array([self.starting_value] * X.shape[0])
         for _ in range(self.n_estimators):
+            residuals = y - pred
+            if any(np.abs(residuals) < thresh):
+                # residual error is small enough, early stop
+                break  
             tree = Tree(max_depth=self.max_depth,
                         lmbda=self.lmbda,
                         gamma=self.gamma,
-                        loss=self.loss,
                         algorithm=self.algorithm)
-            tree.fit(X, (y - pred), pred)
+            tree.fit(X, residuals, self.gradient(y, pred), self.hessian(y, pred))
 
             if self.loss == 'logistic':
                 # convert pred to log odds, add to prediction,
@@ -59,7 +78,7 @@ class _XGBTreeModel:
                 pred = 1/(1 + np.exp(-pred))
             else:
                 pred += self.eta * tree.predict(X)
-            
+
             self.ensemble.append(tree)
             pbar.update(1)
         pbar.close()
