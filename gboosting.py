@@ -14,7 +14,10 @@ class _XGBTreeModel:
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
                  loss: str = 'mse',
-                 algorithm: str = 'exact'):
+                 algorithm: str = 'exact',
+                 col_subsample: float = 1.0,
+                 seed: int = None
+                 ):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.starting_value = starting_value
@@ -31,6 +34,9 @@ class _XGBTreeModel:
             self.algorithm = algorithm
         else:
             raise ValueError("Splitting algorithm must be either 'exact' or 'approx'.")
+
+        self.generator = np.random.default_rng(seed)
+        self.col_subsample = col_subsample
 
         self.ensemble = []
 
@@ -59,19 +65,28 @@ class _XGBTreeModel:
         pbar = tqdm(range(self.n_estimators), disable=not verbose)
 
         pred = np.array([self.starting_value] * X.shape[0])
+        col_sample = np.arange(X.shape[1])
+
         for _ in range(self.n_estimators):
             residuals = y - pred
             if any(np.abs(residuals) < thresh):
                 # residual error is small enough, early stop
-                break  
+                break
+
+            # column subsampling
+            if self.col_subsample < 1.0:
+                col_sample = self.generator.choice(X.shape[1],
+                                                   int(X.shape[1] * self.col_subsample),
+                                                   replace=False)
+
             tree = Tree(max_depth=self.max_depth,
                         lmbda=self.lmbda,
                         gamma=self.gamma,
                         algorithm=self.algorithm)
-            tree.fit(X, residuals, self.gradient(y, pred), self.hessian(y, pred))
+            tree.fit(X[:,col_sample], residuals, self.gradient(y, pred), self.hessian(y, pred))
 
             if self.loss == 'logistic':
-                # convert pred to log odds, add to prediction,
+                # convert pred to log odds, add to prediction,4
                 # then convert back to probability
                 pred = np.log(pred/(1-pred))
                 pred += self.eta * tree.predict(X)
@@ -111,7 +126,9 @@ class XGBTreeClassifier(_XGBTreeModel):
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
                  loss: str = 'logistic',
-                 algorithm: str = 'exact'):
+                 algorithm: str = 'exact',
+                 col_subsample: float = 1.0,
+                 seed: int = None):
         super().__init__(n_estimators,
                          max_depth,
                          starting_value,
@@ -119,11 +136,18 @@ class XGBTreeClassifier(_XGBTreeModel):
                          lmbda,
                          gamma,
                          loss,
-                         algorithm)
+                         algorithm,
+                         col_subsample,
+                         seed)
     
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
         '''Produce a fitted model.'''
         super().fit(X, y, verbose)
+
+    def predict_proba(self, X):
+        '''Predict the probability of each class for each sample in X.'''
+        pred = super().predict(X)
+        return np.column_stack((1 - pred, pred))
 
     def predict(self, X):
         '''Predict class labels for each sample in X.'''
@@ -144,7 +168,9 @@ class XGBTreeRegressor(_XGBTreeModel):
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
                  loss: str = 'mse',
-                 algorithm: str = 'exact'):
+                 algorithm: str = 'exact',
+                 col_subsample: float = 1.0,
+                 seed: int = None):
         super().__init__(n_estimators,
                          max_depth,
                          starting_value,
@@ -152,7 +178,9 @@ class XGBTreeRegressor(_XGBTreeModel):
                          lmbda,
                          gamma,
                          loss,
-                         algorithm)
+                         algorithm,
+                         col_subsample,
+                         seed)
     
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False):
         '''Produce a fitted model.'''
