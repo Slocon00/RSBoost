@@ -104,7 +104,6 @@ class Tree:
         parent_sim = self._similarity_score(y, gradients, hessians)
 
         for i in range(X.shape[1]):
-            # TODO categorical values?
             feat_vals = np.unique(X[:,i])
 
             # splits are midpoints between feat values
@@ -141,8 +140,46 @@ class Tree:
         using the approximate algorithm, returning a tuple of feature index and
         threshold. If no such split exists, return None.
         '''
+        S = np.unique(X)
+        summary = (S,
+                   np.array([self._r_minus(X, y, x) for x in S]),
+                   np.array([self._r_plus(X, y, x) for x in S]),
+                   np.array([self._omega(X, y, x) for x in S]))
+        
         # TODO
         return None
+
+    def _r_minus(self, X: np.ndarray, y: np.ndarray, x: np.ndarray) -> float:
+        '''Return the rank of x, calculated as the sum of weights assigned to
+        vectors in X that are strictly smaller than x.
+        '''
+        return np.sum(y[X < x])
+
+    def _r_plus(self, X: np.ndarray, y: np.ndarray, x: np.ndarray) -> float:
+        '''Return the rank of x, calculated as the sum of weights assigned to
+        vectors in X that are smaller than or equal to x.
+        '''
+        return np.sum(y[X <= x])
+    
+    def _omega(self, X: np.ndarray, y: np.ndarray, x: np.ndarray) -> float:
+        '''Return the weight of x, calculated as the sum of weights assigned to
+        vectors in X that are equal to x.
+        '''
+        return np.sum(y[X == x])
+
+    def _merge_summaries(self, left: tuple, right: tuple) -> tuple:
+        '''Merge the two summaries in a single one.'''
+        S1 = left[0]
+        S2 = right[0]
+
+        S = np.unique(np.concatenate((S1, S2)))
+        # TODO
+        pass
+
+    def _prune_summary(self, summary: tuple) -> tuple:
+        '''Prune the summary, reducing its size.'''
+        # TODO
+        pass
 
     def _similarity_score(self, y: np.ndarray, gradients: np.ndarray, hessians: np.ndarray) -> float:
         '''Return the similarity score of the data.'''
