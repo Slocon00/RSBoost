@@ -34,7 +34,7 @@ class Tree:
                  lmbda: float = 0.0,
                  gamma: float = 0.0,
                  algorithm: str = 'exact',
-                 epsilon: float = 0.1):
+                 epsilon: float = 0.0):
         self.root = None
         self.max_depth = max_depth
         self.lmbda = lmbda
@@ -142,21 +142,23 @@ class Tree:
         using the approximate algorithm, returning a tuple of feature index and
         threshold. If no such split exists, return None.
         '''
-        # S = np.unique(X)
-        # summary = (S,
-        #           np.array([self._r_minus(X, hessians, x) for x in S]),
-        #           np.array([self._r_plus(X, hessians, x) for x in S]),
-        #           np.array([self._omega(X, hessians, x) for x in S]))
         best_split = None
         parent_sim = self._similarity_score(y, gradients, hessians)
 
-        for i in range(X.shape[1]):
-            # find splits S = {s_1, s_2, ... , s_n} s.t.
-            # |rank(s_i) - rank(s_i+1)| < epsilon
-            splits = np.quantile(X[:,i],
-                                 np.linspace(0, 1, 1/self.epsilon),
-                                 weights=hessians)
-            
+        for i in range(X.shape[1]):   
+            values = np.unique(X[:,i])
+            S = (values,
+                 np.array([self._r_minus(X, hessians, x) for x in S]),
+                 np.array([self._r_plus(X, hessians, x) for x in S]),
+                 np.array([self._omega(X, hessians, x) for x in S]))
+        
+            # epsilon is the "approximation factor", s.t. the difference in rank
+            # between two splits is less than epsilon
+            start, end = np.min(S[3]), np.max(S[3])
+            splits = []
+            for d in np.linspace(start, end, int((end - start)/self.epsilon)):
+                splits.append(self._query(S, d))  
+
             for split in splits:
                 left_y = y[X[:,i] <= split]
                 right_y = y[X[:,i] > split]
@@ -198,19 +200,22 @@ class Tree:
         '''
         return np.sum(h[X == x]) if np.any(X == x) else 0
 
-    def _merge_summaries(self, left: tuple, right: tuple) -> tuple:
-        '''Merge the two summaries in a single one.'''
-        S = np.unique(np.concatenate((left[0], right[0])))
-        r_minus = None
-        r_plus = None
-        omega = None
-        
-        return (S, r_minus, r_plus, omega)
+    def _query(self, S: tuple, d: float):
+        '''Given the summary S and the value d, find the record x in S that is
+        the d*100th percentile of the data.'''
+        if d < 0 or d > 1:
+            raise ValueError("d must be between 0. and 1.")
 
-    def _prune_summary(self, summary: tuple) -> tuple:
-        '''Prune the summary, reducing its size.'''
-        # TODO
-        pass
+        values, r_minus, r_plus, omega = S
+        if d < (r_minus[0] + r_plus[0]) / 2: return values[0]
+        if d >= (r_minus[-1] + r_plus[-1]) / 2: return values[-1]
+
+        for i in range(len(values)-1):
+            if (r_minus[i] + r_plus[i])/2 <= d < (r_minus[i+1] + r_plus[i+1])/2:
+                if 2*d < r_minus[i] + omega[i] + r_plus[i+1] - omega[i+1]:
+                    return values[i]
+                else:
+                    return values[i+1]
 
     def _similarity_score(self, y: np.ndarray, gradients: np.ndarray, hessians: np.ndarray) -> float:
         '''Return the similarity score of the data.'''
