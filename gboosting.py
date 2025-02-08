@@ -1,5 +1,5 @@
 import numpy as np
-from tree import Tree
+from tree import RSTree
 from tqdm import tqdm # type: ignore
 
 class _XGBTreeModel:
@@ -93,7 +93,7 @@ class _XGBTreeModel:
                                                    int(X.shape[0] * self.row_subsample),
                                                    replace=False)
 
-            tree = Tree(max_depth=self.max_depth,
+            tree = RSTree(max_depth=self.max_depth,
                         lmbda=self.lmbda,
                         gamma=self.gamma,
                         algorithm=self.algorithm,
