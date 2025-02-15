@@ -351,16 +351,16 @@ class RSTree:
             feat_vals = np.unique(data.inputs[:, i])
 
             S = (feat_vals,
-                 np.array([self._r_minus(data.inputs, data.hessians, x) for x in feat_vals]), #TODO here i substituted x in S with x in feat_vals, check if it is correct
-                 np.array([self._r_plus(data.inputs, data.hessians, x) for x in feat_vals]), #TODO here i substituted x in S with x in feat_vals, check if it is correct
-                 np.array([self._omega(data.inputs, data.hessians, x) for x in feat_vals]) #TODO here i substituted x in S with x in feat_vals, check if it is correct
+                 np.array([self._r_minus(data.inputs[:,i], data.hessians, x) for x in feat_vals]),
+                 np.array([self._r_plus(data.inputs[:, i], data.hessians, x) for x in feat_vals]),
+                 np.array([self._omega(data.inputs[:, i], data.hessians, x) for x in feat_vals])
                  ) 
 
             # epsilon is the "approximation factor", s.t. the difference in rank
             # between two splits is less than epsilon
             start, end = np.min(S[3]), np.max(S[3])
             splits = []
-            for d in np.linspace(start, end, int((end - start)/epsilon)):
+            for d in np.linspace(start, end, int(1/epsilon)):
                 splits.append(self._query(S, d))  
 
             for split in splits:
@@ -415,8 +415,8 @@ class RSTree:
         Given the summary S and the value d, find the record x in S that is
         the d*100th percentile of the data.
         '''
-        if d < 0 or d > 1:
-            raise ValueError("d must be between 0. and 1.")
+        if d < 0:
+            raise ValueError("d must be greater than 0.")
 
         values, r_minus, r_plus, omega = S
         if d < (r_minus[0] + r_plus[0]) / 2: return values[0]

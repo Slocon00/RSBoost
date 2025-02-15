@@ -15,7 +15,7 @@ class _XGBTreeModel:
                  gamma: float = 0.0,
                  loss: str = 'mse',
                  algorithm: str = 'exact',
-                 epsilon: float = 0.0,
+                 epsilon: float = 0.01,
                  col_subsample: float = 1.0,
                  row_subsample: float = 1.0,
                  seed: int = None
@@ -147,7 +147,7 @@ class XGBTreeClassifier(_XGBTreeModel):
                  gamma: float = 0.0,
                  loss: str = 'logistic',
                  algorithm: str = 'exact',
-                 epsilon: float = 0.0,
+                 epsilon: float = 0.01,
                  col_subsample: float = 1.0,
                  row_subsample: float = 1.0,
                  seed: int = None):
@@ -197,7 +197,7 @@ class XGBTreeRegressor(_XGBTreeModel):
                  gamma: float = 0.0,
                  loss: str = 'mse',
                  algorithm: str = 'exact',
-                 epsilon: float = 0.0,
+                 epsilon: float = 0.1,
                  col_subsample: float = 1.0,
                  row_subsample: float = 1.0,
                  seed: int = None):
@@ -239,7 +239,7 @@ class XGBTreeRanker(_XGBTreeModel):
                  gamma: float = 0.0,
                  loss: str = 'pairwise',
                  algorithm: str = 'exact',
-                 epsilon: float = 0.0,
+                 epsilon: float = 0.01,
                  col_subsample: float = 1.0,
                  row_subsample: float = 1.0,
                  seed: int = None):
