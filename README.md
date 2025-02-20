@@ -1,4 +1,4 @@
-# Information Retrieval final project
+# RSBoost - a Really Simple XGBoost implementation
 
 Project developed for the Information Retrieval 24-25 course at University of Pisa. The project consists in reproducing the experiments/results presented in
 
