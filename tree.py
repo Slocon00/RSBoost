@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Self, Optional
+from typing import Optional
 from dataclasses import dataclass
 from collections import deque
 
@@ -71,7 +71,7 @@ class _Dummy(_RSNode):
     tree of nodes
     '''
 
-@dataclass(frozen=True) # frozen=True is here to make it immutable
+@dataclass(frozen=True) # frozen=True is used to make the class immutable
 class _AlgorithmT:
     """Represent the the type of split finding algorithm employed by the RSTree."""
     
@@ -87,14 +87,14 @@ class _AlgorithmT:
         else:
             raise ValueError(f"Unknown algorithm type: {name}")
 
-@dataclass(frozen=True) # frozen=True is here to make it immutable
+@dataclass(frozen=True) 
 class _Exact(_AlgorithmT):
     """
     Exact algorithm that enumerates over all possible splits
     on all the features.
     """
 
-@dataclass(frozen=True) # frozen=True is here to make it immutable
+@dataclass(frozen=True)
 class _Approximate(_AlgorithmT):
     """
     Approximate algorithm that first proposes candidate splits
@@ -113,8 +113,8 @@ class _Statistics:
     Attributes:
         inputs: the values of the training instances. It is containes as a 2D matrix.
         targets: the targets of the training instances.
-        gradients: TODO description here
-        hessians: TODO description here
+        gradients: 
+        hessians: 
     '''
     inputs: np.ndarray
     targets: np.ndarray
@@ -129,8 +129,8 @@ class RSTree:
     Attributes:
         nodes: the vector of nodes representing the tree's structure.
         max_depth : a limit indicating the max_depth the tree can reach during construction.
-        lmbda: a constant hyperparameter TODO Add better description.
-        gamma: a constant hyperparameter TODO Add better description.
+        lmbda: a constant hyperparameter.
+        gamma: a constant hyperparameter.
         algorithm: indicates the type of split algorithm used for constructing the tree.
         ranks: implements the rank query in how to move inside the succint encoding
     '''
@@ -146,7 +146,6 @@ class RSTree:
         self.gamma = gamma
         self.algorithm = _AlgorithmT.from_str(algorithm, epsilon)
         self.ranks: list[int] = []
-        self.children: list[_ChildrenT] = []
 
     def fit(self,
                     inputs: np.ndarray,
@@ -167,7 +166,6 @@ class RSTree:
         children : list[_ChildrenT] = []
         self._build_tree(data, 0, children)
         self._serialize(children)
-        self.children = children
 
     def _build_tree(self,
                     data: _Statistics,
@@ -183,10 +181,11 @@ class RSTree:
         Returns:
             the index of the node in the array
         '''
-        # Constructing an internal node
+        # If we have reached the max_depth then construct a leaf,
+        # otherwise try to construct an internal node
         if depth != self.max_depth:
             
-            # compute the best split
+            # CASE: construct an internal node
             split = None
             match self.algorithm:
                 case _Exact():
@@ -196,7 +195,7 @@ class RSTree:
                 case _:
                     raise ValueError("Unknown Split Algorithm variant")
             
-            # if the split is None then construct a Leaf,
+            # If the split is None then construct a leaf,
             # otherwise continue
             if split is not None:
                 node = _Internal(threshold = split)
@@ -204,7 +203,7 @@ class RSTree:
                 self.nodes.append(node)
                 children.append(_ChildrenT())
                 
-                node_idx = len(self.nodes) - 1 # THIS IS ALSO THE IDX FOR `children`
+                node_idx = len(self.nodes) - 1 
                 
                 # Computing children
                 left_child_idx = self._build_tree(
@@ -230,17 +229,17 @@ class RSTree:
                 children[node_idx].right = right_child_idx
 
                 return node_idx
-        # Construct a leaf
+            
+
+        # CASE: construct a leaf
         pred = np.sum(data.gradients)/(np.sum(data.hessians) + self.lmbda)
         leaf = _Leaf(prediction=pred)
 
         self.nodes.append(leaf)
         children.append(_ChildrenT())
-
-        leaf_idx = len(self.nodes) - 1 # THIS IS ALSO THE IDX FOR `children`
-
-        # Add dummy children for the leaf (EXPAND PHASE of Succint Encoding)
-        # The Labeling is handled already by the type of the nodes
+        leaf_idx = len(self.nodes) - 1 
+        
+        # Add dummy children for the leaf (Expand Phase of Succint Encoding)
         dummy_left = _Dummy()
         self.nodes.append(dummy_left)
         children.append(None)
@@ -256,16 +255,15 @@ class RSTree:
     
     def _serialize(self, children: list[_ChildrenT]):
         '''
-        TODO add better description.
-        Applies a BFS over the array in order to construct
-        a succint encoding of the tree
+        Applies a BFS over the expanded tree in order to construct
+        finalise the succint encoding of the tree
         '''
-        # start at the root
+        # Initialise the process
         queue = deque([0]) # start the BFS from the root
         old_nodes = self.nodes
         self.nodes = []
         old_to_new = {} # maps old indices to new indices
-        count = 0 # counts the number of nodes set to True(1) encountered so far
+        count = 0 # counts the number of real nodes (i.e. not of type _Dummy) encountered so far
         self.ranks = []
 
         # SERIALIZE PHASE of Succint Encoding
@@ -431,30 +429,38 @@ class RSTree:
                 
 
     def _similarity_score(self, gradients: np.ndarray, hessians: np.ndarray) -> float:
-        '''Return the similarity score of the data.'''
+        '''
+        Return the similarity score of the data.
+        '''
         return np.sum(gradients)**2 / (np.sum(hessians) + self.lmbda)
     
-    # TODO update predict with now moving using succint encoding
     def predict(self, input: np.ndarray) -> np.ndarray:
-        '''Predict the output of each sample of input.'''        
+        '''
+        Predicts the output of each sample of input. 
+        '''        
         pred = np.zeros(input.shape[0])
         
         for i in range(input.shape[0]):
             curr_idx = 0
             while True:
-                match self.nodes[curr_idx]:
-                    case _Internal(threshold):
-                        if (input[i][threshold.feature] <= threshold.value):
-                            l = ((curr_idx + 1) * 2) - 1
-                            curr_idx = self.ranks[l] - 1
-                        else:
-                            r = ((curr_idx + 1) * 2)
-                            curr_idx = self.ranks[r] - 1
-                    case _Leaf(prediction):
-                        pred[i] = prediction
-                        break
-                    case _Dummy():
-                        print("OH NO WHY AM I HERE!")
+                try: 
+                    match self.nodes[curr_idx]:
+                        case _Internal(threshold):
+                            if (input[i][threshold.feature] <= threshold.value):
+                                # move left
+                                l = ((curr_idx + 1) * 2) - 1
+                                curr_idx = self.ranks[l] - 1
+                            else:
+                                # move right
+                                r = ((curr_idx + 1) * 2)
+                                curr_idx = self.ranks[r] - 1
+                        case _Leaf(prediction):
+                            pred[i] = prediction
+                            break
+                        case _Dummy():
+                            raise TypeError('Error! Encountered a _Dummy node, only _Internal and _Leaf nodes should be present in a finalised tree.')
+                except TypeError as error:
+                    raise
 
         return pred
 
