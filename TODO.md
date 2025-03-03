@@ -1,9 +1,3 @@
-- **[ ] Run tests on datasets used in the paper**
-    - [ ] Allstate
-    - [x] Higgs
-    - [x] Criteo
-    - [ ] Yahoo
-
 - **[ ] Implement separate interfaces for Regressor, Classifier, Ranker**
     - [x] Classifier
     - [x] Regressor
