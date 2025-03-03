@@ -1,7 +1,7 @@
 - [ ] Run tests on datasets used in the paper
     - [ ] Allstate
     - [x] Higgs
-    - [ ] Criteo
+    - [x] Criteo
     - [ ] Yahoo
 
 - [ ] Implement separate interfaces for Regressor, Classifier, Ranker
@@ -9,6 +9,6 @@
     - [x] Regressor
     - [ ] Ranker
 
-- [ ] Implement approximate split finder algorithm
+- [x] Implement approximate split finder algorithm
 
 - [ ] Add support for categorical variables
